@@ -1,7 +1,10 @@
 # Allin1
 paired fastq file all-in-one analysis script. Quality Control, Alignment, ANI, sendsketch, multiqc, confindr...
+
 How to use: Have all fastq files either in current directory or ./reads directory.
+
 Command: bash master.sh
+
 Command: bash scripts/master.sh <--- if scripts are in the ./scripts directory
 
 Reference Preparation and indexing
