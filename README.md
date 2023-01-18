@@ -4,8 +4,7 @@ How to use: Have all fastq files either in current directory or ./reads director
 Command: bash master.sh
 Command: bash scripts/master.sh <--- if scripts are in the ./scripts directory
 
-
-1. Reference Preparation and indexing
+Reference Preparation and indexing
         Done in a for loop through all fastq files.
         sendsketch matches current fastq file to a reference sequence and gets ANI
         ncbi-genome-download downloads the reference
@@ -13,7 +12,7 @@ Command: bash scripts/master.sh <--- if scripts are in the ./scripts directory
         bwa mem alignments are done using the current pair of read files
         samtools used for BAM creation and sorting
 
-2. Sample QC and cleaning
+Sample QC and cleaning
         fastqc is run on all fastq files and sorted bam files
         qualimap multi-bamqc is performed on all sorted bam files
         multiqc combines QC metrics into an html
