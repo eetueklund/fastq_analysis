@@ -1,7 +1,7 @@
 # Allin1
-## Paired fastq file all-in-one analysis script. Quality Control, Alignment, ANI, sendsketch, multiqc, confindr...
+## Paired fastq file all-in-one analysis script. Quality Control, BWA Alignment, Samtools, Kraken2, ANI, bcftools, multiqc, confindr...
 
-How to use: Have all fastq files either in current directory or ./reads directory.
+How to use: Have all fastq files either in current directory or ./reads directory. Have all script files either in current directory or ./scripts directory. 
    
         Command: bash master.sh
         
@@ -13,7 +13,7 @@ How to use: Have all fastq files either in current directory or ./reads director
         - Kraken2 matches current fastq file to a reference sequence and downloads it
         - bwa index, samtool faidx, and picard dict are run on the reference sequences
         - bwa mem alignments are done using the current pair of read files
-        - samtools used for BAM creation and sorting
+        - samtools used for indexing, BAM creation, and sorting
         - bcftools to make a consensus sequence based on read files
         - FastANI to calculate Average Nucleotide Identity
 
