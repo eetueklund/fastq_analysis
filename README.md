@@ -1,5 +1,5 @@
 # Allin1
-## Paired fastq file all-in-one analysis script. Quality Control, Alignment, Kraken2, ANI, bcftools, multiqc, confindr...
+## Paired fastq file all-in-one analysis script. Quality Control, BWA Alignment, Samtools, Kraken2, ANI, bcftools, multiqc, confindr...
 
 How to use: Have all fastq files either in current directory or ./reads directory.
    
