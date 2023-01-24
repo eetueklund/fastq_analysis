@@ -85,30 +85,22 @@ bothfiles=false
 mkdir tmpRef
 for file in *.fastq*; do
 	
-	# Not the cleanest way to get Read Group information to include for BWA run.
-    	ID1="${file%-*}"  # gives everything before the last -
-        ID2="${ID1%-*}"
-        ID3="${ID2%-*}"
-        after="${file#*-}" # gives everything after the first -
-        after2="${after#*-}"
-        after3="${after2#*-}"
-        after4="${after3#*-}"
-        middle="${after3%%.*}" # gives everything before . and after -
-        middle2="${middle%_*}"
-        middle3="${middle2%_*}"
-        middle4="${middle3%_*}"
-	LB2="${middle3#*_}"
-
-        ID="${ID3%-*}"
-        SM="${middle4%_*}"
-        PU="${middle4#*_}"
-        LB="${LB2#*_}"
+	# Gets Read Group information to include for BWA run. (ID,SM,LB,PU,PL)
+	front="${file%%_*}"
+        front2="${front#*-}"
+        front3="${front2#*-}"
+        back="${file#*_}"
+        back2="${back#*_}"
+        ID="${file%%-*}"
+        SM="${front3#*-}"
+        LB="${back%%_*}"
+        PU="${back2%%_*}"
         PL=illumina
-	
+
     	# checks if we have both read files (and that they are pairs)
     	if [ "$bothfiles" = true ]; then
 		# sendsketch finds closest matching taxon and its taxid
-		~/bbmap/sendsketch.sh $R1File > sendsketch.txt
+		~/bbmap/sendsketch.sh $R1File reads=1m samplerate=0.5 minkeycount=2 > sendsketch.txt
 		
 		# extracts taxid for the species (only first single reference file)
 		taxids=$(python3 extract_taxid2.py)
