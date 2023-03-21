@@ -6,13 +6,15 @@
 import xlsxwriter
 import re
 import os
+import sys
 
-workbook = xlsxwriter.Workbook('summary.xlsx')
+dir = sys.argv[1]
+workbook = xlsxwriter.Workbook(dir+'/summary.xlsx')
 worksheet = workbook.add_worksheet()
 
 headers = ["Sample", "Basic Statistics", "Per Base Sequence Quality", "Per Sequence Quality Scores", "Per Base Sequence Content",
           "Per Sequence GC Content", "Per Base N Content", "Sequence Duplication Levels", "Adapter Content", "Coverage",
-           "Mean Mapping Quality", "% Aligned", "ANI", "Per Base Quality", "Contamination", "% Contamination"]
+           "Mean Mapping Quality", "% Aligned", "ANI", "Per Base Quality", "Contamination", "% Contamination", "Taxonomy"]
 row = 0
 col = 0
 
@@ -25,11 +27,11 @@ col = 0
 row += 1
 
 # Could color cells below to green, yellow, red based on pass, warn, fail.
-#cell_format.set_font_color('red')
-#worksheet.write(0, 0, 'Wheelbarrow', cell_format)
+# cell_format.set_font_color('red')
+# worksheet.write(0, 0, 'Wheelbarrow', cell_format)
 
 # Extracts fastqc general statistics
-f = open("results/multiqc_data/multiqc_fastqc.txt", "r")
+f = open(dir+"/results/multiqc_data/multiqc_fastqc.txt", "r")
 f.readline()
 for line in f:
     line = line.split("\t")
@@ -52,15 +54,15 @@ for line in f:
     worksheet.write(row, col+6, per_base_N)
     worksheet.write(row, col + 7, sequence_dup)
     worksheet.write(row, col + 8, adapter_content)
-    #worksheet.write(row, col+7, )  coverage
-    #worksheet.write(row, col+8, )  Mean Quality
+    # worksheet.write(row, col+7, )  coverage
+    # worksheet.write(row, col+8, )  Mean Quality
     row += 1
 f.close()
 
 # writes mean coverage, quality, and % aligned to every other row (one for each pair of fastq files)
-f2 = open("results/multiqc_data/multiqc_qualimap_bamqc_genome_results.txt", "r")
+f2 = open(dir+"/results/multiqc_data/multiqc_qualimap_bamqc_genome_results.txt", "r")
 f2.readline()
-row=1
+row = 1
 for l in f2:
     l = l.split("\t")
     sample = l[0]
@@ -68,59 +70,62 @@ for l in f2:
     mean_cov = l[10]
     percentage_aligned = l[11]
 
-    #worksheet.write(row, col, sample)
+    # worksheet.write(row, col, sample)
     worksheet.write(row, col+9, float(mean_cov))
     worksheet.write(row, col+10, float(map_qual))
     worksheet.write(row, col+11, float(percentage_aligned))
 
     row += 2
 
-#Extracts ANI numbers
-files = sorted(os.listdir("./results/ANI"))
-row=1
+# Extracts ANI numbers
+files = sorted(os.listdir(dir+"/results/sendsketch"))
+row = 1
 
 for file in files:
-    # Extracts 1 ANI from each file and writes it to summary
-    f=open("./results/ANI/"+file, 'r')
-    l=f.readline()
-    l=l.split("\t")
-    if len(l)>1:
-        worksheet.write(row, col + 12, float(l[2]))
-    elif len(l) == 1:
-        worksheet.write(row, col + 12, "no output")
-    row+=2
+    # Extracts 1 ANI and Taxonomy name from each file and writes it to summary
+    f = open(dir+"/results/sendsketch/"+file, 'r')
+    f.readline()
+    f.readline()
+    f.readline()
+    l = f.readline()
+    l = l.split("\t")
+    worksheet.write(row, col + 12, l[2])
+    # removes ANSI escape sequences from Taxonomy name, might only work for one color. make this work for all ANSI
+    taxonomy = l[11].split()
+    worksheet.write(row, col + 16, l[11].replace("\x1b[0m\n", ""))
+    row += 2
     f.close()
 f2.close()
 
-row=1
+row = 1
 sum = 0.0
 score = 0.0
 n = 0.0
-calculate=False
+calculate = False
 # Extracts and calculates average quality score
-dirs = sorted(os.listdir("./results/fastqc/tmp"))
-for dir in dirs:
-    file2 = open("./results/fastqc/tmp/"+dir+"/fastqc_data.txt", 'r')
+dirs = sorted(os.listdir(dir+"/results/fastqc/tmp"))
+for dir2 in dirs:
+    file2 = open(dir+"/results/fastqc/tmp/"+dir2+"/fastqc_data.txt", 'r')
     for line in file2:
         if ">>Per base sequence quality" in line:
             file2.readline()
             line = file2.readline()
-            calculate=True
+            calculate = True
         if ">>END_MODULE" in line:
-            calculate=False
-        if calculate==True:
+            calculate = False
+        if calculate:
             score = line.split("\t")[1]
             sum += float(score)
             n += 1
-    if n!=0.0:
+    if n != 0.0:
         worksheet.write(row, col + 13, sum/n)
-        row+=1
+        row += 1
     sum = 0.0
     score = 0.0
     n = 0.0
     file2.close()
 
-f3 = open("./results/confindr_out/confindr_report.csv", "r")
+f3 = open(dir+"/results/confindr_out/confindr_report.csv", "r")
 f3.readline()
 row = 1
 for l3 in f3:
@@ -131,5 +136,4 @@ for l3 in f3:
     worksheet.write(row, col + 15, PercentContam)
     row += 2
 f3.close()
-
 workbook.close()

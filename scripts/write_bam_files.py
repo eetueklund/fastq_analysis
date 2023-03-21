@@ -4,8 +4,11 @@
 # 1/5/2023
 
 import os
+import sys
 
-files = sorted(os.listdir("./results/alignments"))
+dir=sys.argv[1]
+
+files = sorted(os.listdir(dir+"/results/alignments"))
 f = open("bam_files.txt", "w")
 
 for file in files:
