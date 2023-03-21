@@ -2,10 +2,12 @@
 ## Paired fastq file all-in-one analysis script. Quality Control, BWA Alignment, Samtools, sendsketch, bcftools, AMRFinder+, confindr, multiqc...
 
 How to use: All fastq files should be located in current working directory. Have all script files either in current working directory or ./scripts directory. 
+            First argument should be the date in YYMMDD format. This is where all files will be moved to.
+            Optional second argument is the string "runAMR". This tells the program to run AMRFinder+. (Run time ~doubles)
    
-        Command: bash master.sh
+        Command: bash master.sh 230321
         
-        Command: bash scripts/master.sh
+        Command: bash scripts/master.sh 230321 runAMR
 
 ### 1. Reference Preparation and indexing
 
