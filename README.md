@@ -1,7 +1,7 @@
 # Allin1
-## Paired fastq file all-in-one analysis script. Quality Control, BWA Alignment, Samtools, Kraken2, ANI, bcftools, multiqc, confindr...
+## Paired fastq file all-in-one analysis script. Quality Control, BWA Alignment, Samtools, sendsketch, bcftools, AMRFinder+, confindr, multiqc...
 
-How to use: Have all fastq files either in current directory or ./reads directory. Have all script files either in current directory or ./scripts directory. 
+How to use: All fastq files should be located in current working directory. Have all script files either in current working directory or ./scripts directory. 
    
         Command: bash master.sh
         
@@ -10,12 +10,13 @@ How to use: Have all fastq files either in current directory or ./reads director
 ### 1. Reference Preparation and indexing
 
         - Done in a for loop through all fastq files.
-        - Kraken2 matches current fastq file to a reference sequence and downloads it
+        - sendsketch matches current fastq file to a reference sequence and downloads it using ncbi-genome-download
         - bwa index, samtool faidx, and picard dict are run on the reference sequences
         - bwa mem alignments are done using the current pair of read files
         - samtools used for indexing, BAM creation, and sorting
         - bcftools to make a consensus sequence based on read files
-        - FastANI to calculate Average Nucleotide Identity
+        - optionally AMRFinder+ finds Antimicrobial resistance genes
+            - This also creates a consensus fasta sequence from the .bam alignment file
 
 ### 2. Sample QC and cleaning
 
