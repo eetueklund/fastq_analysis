@@ -36,14 +36,14 @@ f.readline()
 for line in f:
     line = line.split("\t")
     sample = line[0]
-    basic = line[10]
-    per_base_qual = line[11]
-    per_sequence_qual = line[13]
-    per_base_sequence_content = line[14]
-    per_sequence_GC = line[15]
-    per_base_N = line[16]
-    sequence_dup = line[18]
-    adapter_content = line[20]
+    basic = line[12]
+    per_base_qual = line[13]
+    per_sequence_qual = line[15]
+    per_base_sequence_content = line[16]
+    per_sequence_GC = line[17]
+    per_base_N = line[18]
+    sequence_dup = line[20]
+    adapter_content = line[22]
 
     worksheet.write(row, col, sample)
     worksheet.write(row, col+1, basic)

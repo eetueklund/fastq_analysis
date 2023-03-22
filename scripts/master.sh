@@ -14,7 +14,7 @@
 #               Performs QC, BWA Alignment, and ANI calculation on read files
 # Author: Eetu Eklund
 # Email: eetu.eklund@maryland.gov
-# Execute Script: bash master.sh directory_name runAMR
+# Execute Script: bash master.sh YYMMDD runAMR
 # Examples: bash scripts/master.sh 230101
 # 	    bash scripts/master.sh 230101 runAMR  <--option to run AMRFinderPlus
 # Works with read files in current working directory
@@ -22,6 +22,9 @@
 
 # Future additions:
 # Error handling
+# trimmomatic or fastp
+# kraken 2 as double check for sendsketch and confindr
+# Transcription Factor binding sites(TFBS), promoter region?? Do any programs look for these in reads?
 
 # 1. Reference Preparation and indexing
 	# Done in a for loop through all fastq files.
@@ -42,17 +45,17 @@
 
 
 # check if condaenv exists. Activates condaenv if it does, creates condaenv and installs requirements if it does not.
-if conda env list | grep ".*condaenv.*"; then
+if conda env list | grep ".*fastq_analysis.*"; then
         source ~/miniconda3-2/etc/profile.d/conda.sh
-        conda activate condaenv
+        conda activate fastq_analysis
 else
         source ~/miniconda3-2/etc/profile.d/conda.sh
-        conda create -n condaenv python=3.9 anaconda
+        conda create -n fastq_analysis python=3.9 anaconda
 	conda init bash
-	conda activate condaenv
-        conda install -c conda-forge bwa samtools biokit fastqc multiqc qualimap ncbi-genome-download picard xlsxwriter bcftools #seqkit seqkt mummer
+	conda activate fastq_analysis
+        conda install -c conda-forge bwa samtools biokit fastqc multiqc qualimap ncbi-genome-download picard xlsxwriter bcftools fastp=0.22.0 #confindr seqkit seqkt mummer
+	pip install confindr #<-- in the conda env. A python file in the confindr has to be modified to work
 fi
-
 
 # Program takes in two arguments:
 # 	The current date to name directory where all read and result files are put in (YY/MM/DD)
@@ -66,14 +69,14 @@ mkdir ./$dir
 mkdir ./$dir/results
 
 runAMR=$2
-if [ $runAMR == "runAMR" ]; then
+if [[ $runAMR == "runAMR" ]]; then
 	echo
 	echo
         echo Running program with AMRFinderPlus to find antimicrobial resistance genes in samples.
         echo This will at least double the compute time...
 	echo
 	echo
-	sleep 3s
+	sleep 1s
 	mkdir $dir/results/AMRFinder
 	mkdir $dir/results/consensus_seqs
 	mkdir $dir/results/vcf_files
@@ -84,6 +87,7 @@ if [ -d "./scripts/" ]; then
 fi
 # creates directories to put output files in.
 mkdir $dir/reference
+mkdir $dir/reads
 mkdir $dir/results/alignments
 mkdir $dir/results/sendsketch
 if [ -d "./reads" ]; then
@@ -92,8 +96,6 @@ fi
 
 
 # look into and test fastp for filtering low quality reads, removing adapters, and quality control
-
-
 
 
 # export gsl path
@@ -131,8 +133,18 @@ for file in *.fastq*; do
 
     	# checks if we have both read files (and that they are pairs)
     	if [ "$bothfiles" = true ]; then
+		filename="${R1File%%.*}"
+		filename2="${file%%.*}"
+		#echo $filename
+
+		# Add fastp here for quality control, quality filtering, and adapter trimming
+		#fastp -v
+		fastp -i $R1File -I $file -o $filename.filtered.fastq.gz -O $filename2.filtered.fastq.gz -j $filename.json -h $filename.html
+		mv $R1File $dir/reads
+		mv $file $dir/reads
+
 		# sendsketch finds closest matching taxon and its taxid
-		~/bbmap/sendsketch.sh $R1File reads=1m samplerate=0.5 minkeycount=2 > sendsketch.txt
+		~/bbmap/sendsketch.sh $filename.filtered.fastq.gz reads=1m samplerate=0.5 minkeycount=2 > sendsketch.txt
 
 		# could use kraken2 as a double check on sendsketch and confindr
 		# would tell us taxid of closest genus+species if ncbi-genome-download fails with taxid from sendsketch
@@ -146,8 +158,7 @@ for file in *.fastq*; do
 			# downloads reference file
 			# uses second taxid if first does not have a downloadable file
 			# reference sequences are not ideal but work fine
-			ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 bacteria,viral 
-#|| sed '1d' sendsketch.txt > tmpfile; mv tmpfile sendsketch.txt;taxids=$(python3 extract_taxid.py);ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 bacteria,viral; sed -i '1s/^/\n/' sendsketch.txt
+			ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 bacteria,viral || (sed '1d' sendsketch.txt > tmpfile; mv tmpfile sendsketch.txt;taxids=$(python3 extract_taxid.py);ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 bacteria,viral; sed -i '1s/^/\n/' sendsketch.txt)
 
 			# keeps list of taxids used and makes a directory named after taxid for reference
 			taxid_list=(${taxid_list[@]} $taxids)
@@ -169,14 +180,12 @@ for file in *.fastq*; do
 			mv $dir/reference/$taxids/* ./tmpRef/.
 		fi
 
-		filename="${R1File%%.*}"
-
 		# bwa alignment
 		# bwa mem -v 2 -t 4 tmpRef/*.fna $R1File $file > results/alignments/$R1File.sam
-		bwa mem -R '@RG\tID:'$ID'\tLB:'$LB'\tPL:'$PL'\tSM:'$SM'\tPU:'$PU -v 2 -t 8 tmpRef/*.fna $R1File $file > $dir/results/alignments/$R1File.sam
+		bwa mem -R '@RG\tID:'$ID'\tLB:'$LB'\tPL:'$PL'\tSM:'$SM'\tPU:'$PU -v 2 -t 8 tmpRef/*.fna $filename.filtered.fastq.gz $filename2.filtered.fastq.gz > $dir/results/alignments/$filename.sam
 
 		# samtools indexing and making bam files
-		samtools view -@ 8 $dir/results/alignments/$R1File.sam -o $dir/results/alignments/$filename.bam
+		samtools view -@ 8 $dir/results/alignments/$filename.sam -o $dir/results/alignments/$filename.bam
 		samtools sort -@ 8 $dir/results/alignments/$filename.bam -o $dir/results/alignments/$filename.sorted.bam
 		samtools index -@ 8 $dir/results/alignments/$filename.sorted.bam
 
@@ -184,7 +193,7 @@ for file in *.fastq*; do
 
 		# if runAMR option is given, AMRFinderPlus is used to find antimicrobial resistance genes
 		# This will increase runtime a good amount, so it is optional
-		if [ $runAMR == "runAMR" ]; then
+		if [[ $runAMR == "runAMR" ]]; then
 			bash runAMR.sh $dir/results/alignments/$filename.sorted.bam tmpRef/*.fna $filename
 			mv *.vcf.gz* $dir/results/vcf_files
 			mv *.consensus.fa $dir/results/consensus_seqs
@@ -206,7 +215,8 @@ rm -r ./tmpRef
 
 # Quality Control with FastQc
 fastqc *.fastq* -o $dir -t 12
-fastqc $dir/results/alignments/*.sorted.bam -o $dir -t 12
+# am fastqc in set temporarily to different directory so multiqc doesnt use it (so summary file gets written properly)
+#fastqc $dir/results/alignments/*.sorted.bam -o $dir/results -t 12
 
 # Include these in our path for confindr to use
 export PATH=$PATH:/home/mdhsequencing/bbmap
@@ -215,7 +225,7 @@ export PATH=$PATH:/home/mdhsequencing/kma
 # contamination finder
 # Not easy to get working. had to change a line of code in two python files (database_setup.py, bbtools.py)
 # :~/miniconda3-2/envs/condaenv/lib/python3.9/site-packages/confindr_src
-# confindr_src/wrappers/bbtools.py ----> in bbduk_bait function, added --ignorejunk flag to bbduk.sh commands
+# confindr_src/wrappers/bbtools.py ----> in bbduk_bait function, added --ignorejunk flag to bbduk.sh cmd = ... commands
 # confindr_src/database_setup.py ----> line 209, added .encode() to the end of the line
 confindr.py -i ./ -o $dir/results/confindr_out --rmlst -d ~/.confindr_db
 
@@ -252,13 +262,16 @@ mkdir $dir/results/fastqc/tmp
 for file in $dir/results/fastqc/*fastqc.zip; do
 	unzip $file -d $dir/results/fastqc/tmp >/dev/null 2>&1
 done
-rm -r $dir/results/fastqc/tmp/*.sorted_fastqc
+#rm -r $dir/results/fastqc/tmp/*.sorted_fastqc
 
 # Writes all quality control statistics, Coverage, ANI... from read files to one excel file
 python write_summary.py $dir
+# move bam fastqc file and others back after summary written
+#mv $dir/results/*.sorted_fastqc.zip $dir/results/fastqc
+mv $dir/results/fastqc/tmp/* $dir/results/fastqc
 
 # writes summary file from AMRFinderPlus results
-if [ $runAMR == "runAMR" ]; then
+if [[ $runAMR == "runAMR" ]]; then
 	python3 AMR_write.py $dir
 fi
 
@@ -277,14 +290,13 @@ done
 if [ -d "$dir/results/consensus_seqs" ]; then
         gzip $dir/results/consensus_seqs/*
 fi
-if [ ! -d "$dir/reads" ]; then
-	mkdir $dir/reads
-	mv *.fastq* $dir/reads
-fi
+mv *.fastq* $dir/reads
 if [ ! -d "./scripts/" ]; then
         mkdir scripts
 fi
 mv *.sh scripts
 mv *.py scripts
+mv *.html $dir/results/fastqc
+mv *.json $dir/results/fastqc
 
 conda deactivate
