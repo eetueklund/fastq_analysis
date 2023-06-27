@@ -1,9 +1,14 @@
 # Allin1
 ## Paired fastq file all-in-one analysis script. Quality Control, BWA Alignment, Samtools, sendsketch, bcftools, AMRFinder+, confindr, multiqc...
 
-How to use: All fastq files should be located in current working directory. Have all script files either in current working directory or ./scripts directory. 
-            First argument should be the date in YYMMDD format. This is where all files will be moved to.
-            Optional second argument is the string "runAMR". This tells the program to run AMRFinder+. (Run time ~doubles)
+### How to use: 
+All fastq files should be located in current working directory. Have all script files either in current working directory or ./scripts directory. 
+
+First argument should be the date in YYMMDD format. This is where all files will be moved to.
+
+Optional second argument is the string "runAMR". This tells the program to run AMRFinder+. (Run time ~doubles)
+
+Conda Environment is created and downloads all required packages if the environemnt does not exist. (conda install sometimes fails)
    
         Command: bash master.sh 230321
         
