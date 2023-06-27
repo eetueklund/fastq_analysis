@@ -11,7 +11,7 @@
 # Script Name: master.sh
 # Description: QC Analysis and Sequence Alignment Script.
 #               Script currently works in the same directory as fastq read files
-#               Performs QC, BWA Alignment, and ANI calculation on read files
+#               Performs QC, BWA Alignment, ANI calculations, and more on read files
 # Author: Eetu Eklund
 # Email: eetu.eklund@maryland.gov
 # Execute Script: bash master.sh YYMMDD runAMR
@@ -25,9 +25,11 @@
 # trimmomatic or fastp
 # kraken 2 as double check for sendsketch and confindr
 # Transcription Factor binding sites(TFBS), promoter region?? Do any programs look for these in reads?
+# edit write_summary.py if fastp gives general QC statistics (fastp does not give general stats)
 
 # 1. Reference Preparation and indexing
-	# Done in a for loop through all fastq files.
+	# The following operations are done in a for loop through all fastq files.
+	# fastp to filter read files and QC
 	# sendsketch matches current fastq file to a reference sequence and gets ANI
 	# ncbi-genome-download downloads the reference
 	# bwa index, samtool faidx, and picard dict are run on the reference sequences
@@ -69,6 +71,8 @@ mkdir ./$dir
 mkdir ./$dir/results
 
 runAMR=$2
+runBMGAP=$3
+BMGAP=False
 if [[ $runAMR == "runAMR" ]]; then
 	echo
 	echo
@@ -80,6 +84,12 @@ if [[ $runAMR == "runAMR" ]]; then
 	mkdir $dir/results/AMRFinder
 	mkdir $dir/results/consensus_seqs
 	mkdir $dir/results/vcf_files
+	if [[ $runBMGAP == "runBMGAP" ]]; then
+		mkdir $dir/results/BMGAP_output
+		echo Running BMGAP to serotype Meningitidis sequences.
+		echo This will only work with Meningitidis read files and will increase compute time.
+		BMGAP=True
+	fi
 fi
 
 if [ -d "./scripts/" ]; then
@@ -104,10 +114,11 @@ export LD_LIBRARY_PATH
 
 # for loop performs these operations for each pair of fastq file at a time
         # get sample id information and other read group info
+	# fastp performs QC and filtering
         # sendsketch to match it to reference and get ANI
-	# ncbi-genome-download downloads reference seuqnece based on taxid from sendsketch
-        # BWA and samtools index for each reference
-        # Picard CreateSequenceDictionary
+	# ncbi-genome-download downloads reference sequence based on taxid from sendsketch
+        # BWA and samtools index each reference
+        # Picard CreateSequenceDictionary makes dict file for bwa
         # bwa mem for all fastq pairs and their reference
 	# samtools creates sorted bam file
 	# optionally: AMRFinderPlus is used to find antimicrobial resistance genes
@@ -138,7 +149,6 @@ for file in *.fastq*; do
 		#echo $filename
 
 		# Add fastp here for quality control, quality filtering, and adapter trimming
-		#fastp -v
 		fastp -i $R1File -I $file -o $filename.filtered.fastq.gz -O $filename2.filtered.fastq.gz -j $filename.json -h $filename.html
 		mv $R1File $dir/reads
 		mv $file $dir/reads
@@ -196,7 +206,7 @@ for file in *.fastq*; do
 		if [[ $runAMR == "runAMR" ]]; then
 			bash runAMR.sh $dir/results/alignments/$filename.sorted.bam tmpRef/*.fna $filename
 			mv *.vcf.gz* $dir/results/vcf_files
-			mv *.consensus.fa $dir/results/consensus_seqs
+			mv *.consensus.fasta $dir/results/consensus_seqs
 			mv *.AMRout.txt $dir/results/AMRFinder
 		fi
 
@@ -213,9 +223,15 @@ done
 rm -r ./tmpRef
 
 
+
+
+# THIS FASTQC could be deleted when fastp has been tested and works well, but summary file needs fastqc results
+# if we want to delete this fastqc, write_summary.py has to be edited to find QC metrics from fastp
+# QC general statistics (pass/fail) are not in the results of fastp
+
 # Quality Control with FastQc
 fastqc *.fastq* -o $dir -t 12
-# am fastqc in set temporarily to different directory so multiqc doesnt use it (so summary file gets written properly)
+#fastqc is set temporarily to a different directory so multiqc doesnt use it (so summary file gets written properly)
 #fastqc $dir/results/alignments/*.sorted.bam -o $dir/results -t 12
 
 # Include these in our path for confindr to use
@@ -287,9 +303,6 @@ for ref_dir in $ref_dirs; do
 	gzip $dir/reference/$ref_dir/*.fna
 	gzip $dir/reference/$ref_dir/*.fna.bwt
 done
-if [ -d "$dir/results/consensus_seqs" ]; then
-        gzip $dir/results/consensus_seqs/*
-fi
 mv *.fastq* $dir/reads
 if [ ! -d "./scripts/" ]; then
         mkdir scripts
@@ -300,3 +313,14 @@ mv *.html $dir/results/fastqc
 mv *.json $dir/results/fastqc
 
 conda deactivate
+
+if [[ $BMGAP == True ]]; then
+	source ~/7T/BMGAP/pipeline/bmgap/bin/activate
+	echo
+	echo Running BMGAP to serotype Meningitis sequences.
+	echo
+	python3 ~/7T/BMGAP/pipeline/PMGA/blast_pubmlst.py -d $dir/results/consensus_seqs -o $dir/results/BMGAP_output -t 4 -sg -fr -p
+fi
+if [ -d "$dir/results/consensus_seqs" ]; then
+        gzip $dir/results/consensus_seqs/*
+fi

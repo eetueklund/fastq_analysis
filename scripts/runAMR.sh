@@ -21,7 +21,7 @@ bcftools index $readfile.vcf.gz --threads 8
 #bcftools filter --IndelGap 5 calls.norm.bcf -Ob -o calls.norm.flt-indels.bcf
 
 # apply variants to create consensus sequence
-cat $ref_path | bcftools consensus $readfile.vcf.gz > $readfile.consensus.fa
+cat $ref_path | bcftools consensus $readfile.vcf.gz > $readfile.consensus.fasta
 
 
 #bcftools call -mv -Oz -o $readfile.vcf.gz tabix $readfile.vcf.gz cat $ref_path | \
@@ -30,7 +30,7 @@ cat $ref_path | bcftools consensus $readfile.vcf.gz > $readfile.consensus.fa
 # Second option for consensus generation
 #samtools mpileup -d 1000 -A -Q 0 test.bam | ivar consensus -p consensus.out -q 20 -t 0
 
-docker run --rm -v ${PWD}:/data ncbi/amr amrfinder -n $readfile.consensus.fa --threads 8 > $readfile.AMRout.txt
+docker run --rm -v ${PWD}:/data ncbi/amr amrfinder -n $readfile.consensus.fasta --threads 8 > $readfile.AMRout.txt
 
 
 # ABRicate command
