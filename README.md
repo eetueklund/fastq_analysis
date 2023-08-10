@@ -9,6 +9,7 @@ First argument should be the date in YYMMDD format. This is where all files will
 Optional second argument is the string "runAMR". This tells the program to run AMRFinder+. (Run time ~doubles)
 
 Conda Environment is automatically created and downloads all required packages if the environment does not already exist. (conda install step sometimes fails. This step should be containerized in the future)
+### EXAMPLES:
    
         Command: bash master.sh 230321
         
@@ -20,7 +21,7 @@ Conda Environment is automatically created and downloads all required packages i
         - fastp preprocesses and filters raw reads
         - sendsketch matches current fastq file to a reference sequence and downloads it using ncbi-genome-download
         - bwa index, samtool faidx, and picard dict are run on the reference sequences
-        - bwa mem alignments are done using the current pair of read files
+        - bwa mem alignment is performed
         - samtools used for indexing, BAM creation, and sorting
         - bcftools to make a consensus sequence based on read files
         - optionally AMRFinder+ finds Antimicrobial resistance genes
