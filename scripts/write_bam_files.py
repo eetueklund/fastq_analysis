@@ -12,7 +12,7 @@ files = sorted(os.listdir(dir+"/results/alignments"))
 f = open("bam_files.txt", "w")
 
 for file in files:
-    if file.endswith(".sorted.bam"):
+    if file.endswith("_sorted.bam"):
         f.write(file[:-11] + "\t" + file + "\n")
 
 f.close()

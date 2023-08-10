@@ -21,13 +21,13 @@
 ################################################################################
 
 # Future additions:
+# docker containerization
 # Error handling
-# trimmomatic or fastp
+# add argument flags
 # kraken 2 as double check for sendsketch and confindr
 # Transcription Factor binding sites(TFBS), promoter region?? Do any programs look for these in reads?
-# edit write_summary.py if fastp gives general QC statistics (fastp does not give general stats)
 
-# 1. Reference Preparation and indexing
+#1. Reference Preparation and indexing
 	# The following operations are done in a for loop through all fastq files.
 	# fastp to filter read files and QC
 	# sendsketch matches current fastq file to a reference sequence and gets ANI
@@ -59,9 +59,11 @@ else
 	pip install confindr #<-- in the conda env. A python file in the confindr has to be modified to work
 fi
 
-# Program takes in two arguments:
+# Program takes in the following arguments:
 # 	The current date to name directory where all read and result files are put in (YY/MM/DD)
 # 	option to run AMRFinderPlus
+# 	option to run BMGAP (only works with bacterial meningitidis sequences)
+# These inputs should be changed to flags (-o, --output, -AMR, -BMGAP)
 dir=$1
 if [ -z "$dir" ]; then
 	echo Please provide a directory name as an argument.
@@ -105,9 +107,6 @@ if [ -d "./reads" ]; then
 fi
 
 
-# look into and test fastp for filtering low quality reads, removing adapters, and quality control
-
-
 # export gsl path
 LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/mdhsequencing/gsl/lib
 export LD_LIBRARY_PATH
@@ -146,19 +145,19 @@ for file in *.fastq*; do
     	if [ "$bothfiles" = true ]; then
 		filename="${R1File%%.*}"
 		filename2="${file%%.*}"
-		#echo $filename
 
-		# Add fastp here for quality control, quality filtering, and adapter trimming
-		fastp -i $R1File -I $file -o $filename.filtered.fastq.gz -O $filename2.filtered.fastq.gz -j $filename.json -h $filename.html
+		# Add fastp here for quality control, filtering, and adapter trimming
+		fastp -i $R1File -I $file -o "${filename}_filtered.fastq.gz" -O "${filename2}_filtered.fastq.gz" -j $filename.json -h $filename.html
 		mv $R1File $dir/reads
 		mv $file $dir/reads
 
 		# sendsketch finds closest matching taxon and its taxid
-		~/bbmap/sendsketch.sh $filename.filtered.fastq.gz reads=1m samplerate=0.5 minkeycount=2 > sendsketch.txt
+		~/bbmap/sendsketch.sh "${filename}_filtered.fastq.gz" reads=1m samplerate=0.5 minkeycount=2 > sendsketch.txt
 
 		# could use kraken2 as a double check on sendsketch and confindr
 		# would tell us taxid of closest genus+species if ncbi-genome-download fails with taxid from sendsketch
 		# would find % of other species' sequences found in sample and alert if that % is too high
+		# Takes a while to load into memory, has to do it for each fastq pair
 
 		# extracts taxid for the species (only first single reference file)
 		taxids=$(python3 extract_taxid.py)
@@ -191,27 +190,25 @@ for file in *.fastq*; do
 		fi
 
 		# bwa alignment
-		# bwa mem -v 2 -t 4 tmpRef/*.fna $R1File $file > results/alignments/$R1File.sam
-		bwa mem -R '@RG\tID:'$ID'\tLB:'$LB'\tPL:'$PL'\tSM:'$SM'\tPU:'$PU -v 2 -t 8 tmpRef/*.fna $filename.filtered.fastq.gz $filename2.filtered.fastq.gz > $dir/results/alignments/$filename.sam
+		bwa mem -R '@RG\tID:'$ID'\tLB:'$LB'\tPL:'$PL'\tSM:'$SM'\tPU:'$PU -v 2 -t 8 tmpRef/*.fna "${filename}_filtered.fastq.gz" "${filename2}_filtered.fastq.gz" > $dir/results/alignments/$filename.sam
 
 		# samtools indexing and making bam files
-		samtools view -@ 8 $dir/results/alignments/$filename.sam -o $dir/results/alignments/$filename.bam
-		samtools sort -@ 8 $dir/results/alignments/$filename.bam -o $dir/results/alignments/$filename.sorted.bam
-		samtools index -@ 8 $dir/results/alignments/$filename.sorted.bam
+		samtools view -u -@ 8 $dir/results/alignments/$filename.sam | samtools sort -@ 8 -o $dir/results/alignments/"${filename}_sorted.bam"
+		samtools index -@ 8 $dir/results/alignments/"${filename}_sorted.bam"
 
 		#Mark pcr duplicates in the sorted bam file before making vcf files for AMRFinder
 
 		# if runAMR option is given, AMRFinderPlus is used to find antimicrobial resistance genes
 		# This will increase runtime a good amount, so it is optional
 		if [[ $runAMR == "runAMR" ]]; then
-			bash runAMR.sh $dir/results/alignments/$filename.sorted.bam tmpRef/*.fna $filename
+			bash runAMR.sh $dir/results/alignments/"${filename}_sorted.bam" tmpRef/*.fna $filename
 			mv *.vcf.gz* $dir/results/vcf_files
-			mv *.consensus.fasta $dir/results/consensus_seqs
-			mv *.AMRout.txt $dir/results/AMRFinder
+			mv *_consensus.fasta $dir/results/consensus_seqs
+			mv *_AMRout.txt $dir/results/AMRFinder
 		fi
 
 		# moves all reference files to reference directory once we are done with them
-		mv sendsketch.txt $dir/results/sendsketch/$filename.sendsketch.txt
+		mv sendsketch.txt $dir/results/sendsketch/"${filename}_sendsketch.txt"
 		mv ./tmpRef/* $dir/reference/$taxids/.
 		bothfiles=false
 		# continue skips rest of for loop so bothfiles stays false
@@ -224,15 +221,14 @@ rm -r ./tmpRef
 
 
 
-
 # THIS FASTQC could be deleted when fastp has been tested and works well, but summary file needs fastqc results
 # if we want to delete this fastqc, write_summary.py has to be edited to find QC metrics from fastp
 # QC general statistics (pass/fail) are not in the results of fastp
-
 # Quality Control with FastQc
 fastqc *.fastq* -o $dir -t 12
 #fastqc is set temporarily to a different directory so multiqc doesnt use it (so summary file gets written properly)
 #fastqc $dir/results/alignments/*.sorted.bam -o $dir/results -t 12
+
 
 # Include these in our path for confindr to use
 export PATH=$PATH:/home/mdhsequencing/bbmap
@@ -278,12 +274,11 @@ mkdir $dir/results/fastqc/tmp
 for file in $dir/results/fastqc/*fastqc.zip; do
 	unzip $file -d $dir/results/fastqc/tmp >/dev/null 2>&1
 done
-#rm -r $dir/results/fastqc/tmp/*.sorted_fastqc
+
 
 # Writes all quality control statistics, Coverage, ANI... from read files to one excel file
 python write_summary.py $dir
 # move bam fastqc file and others back after summary written
-#mv $dir/results/*.sorted_fastqc.zip $dir/results/fastqc
 mv $dir/results/fastqc/tmp/* $dir/results/fastqc
 
 # writes summary file from AMRFinderPlus results
@@ -296,8 +291,10 @@ fi
 echo
 echo "Deleting, compressing, and moving files to clean directory and conserve storage space..."
 echo
+
 rm $dir/results/alignments/*.sam
 rm -r $dir/results/fastqc/tmp
+
 ref_dirs=$(ls $dir/reference/)
 for ref_dir in $ref_dirs; do
 	gzip $dir/reference/$ref_dir/*.fna
@@ -312,8 +309,13 @@ mv *.py scripts
 mv *.html $dir/results/fastqc
 mv *.json $dir/results/fastqc
 
+### Delete unfiltered fastq files to conserve space
+shopt -s extglob
+rm $dir/reads/!(*filtered*)
+
 conda deactivate
 
+# BMGAP is only for serotyping meningitis sequences. this can be removed or added as an argument flag with runAMR
 if [[ $BMGAP == True ]]; then
 	source ~/7T/BMGAP/pipeline/bmgap/bin/activate
 	echo
@@ -324,3 +326,6 @@ fi
 if [ -d "$dir/results/consensus_seqs" ]; then
         gzip $dir/results/consensus_seqs/*
 fi
+
+echo
+echo "Pipeline Completed Succesfully!"

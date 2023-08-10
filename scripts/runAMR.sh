@@ -7,6 +7,7 @@
 bam_path=$1
 ref_path=$2
 readfile=$3
+readfile="${readfile%%_*}"
 
 #Creates consensus fasta sequence from read files to be used in amrfinder
 
@@ -21,7 +22,7 @@ bcftools index $readfile.vcf.gz --threads 8
 #bcftools filter --IndelGap 5 calls.norm.bcf -Ob -o calls.norm.flt-indels.bcf
 
 # apply variants to create consensus sequence
-cat $ref_path | bcftools consensus $readfile.vcf.gz > $readfile.consensus.fasta
+cat $ref_path | bcftools consensus $readfile.vcf.gz > "${readfile}_consensus.fasta"
 
 
 #bcftools call -mv -Oz -o $readfile.vcf.gz tabix $readfile.vcf.gz cat $ref_path | \
@@ -30,7 +31,7 @@ cat $ref_path | bcftools consensus $readfile.vcf.gz > $readfile.consensus.fasta
 # Second option for consensus generation
 #samtools mpileup -d 1000 -A -Q 0 test.bam | ivar consensus -p consensus.out -q 20 -t 0
 
-docker run --rm -v ${PWD}:/data ncbi/amr amrfinder -n $readfile.consensus.fasta --threads 8 > $readfile.AMRout.txt
+docker run --rm -v ${PWD}:/data ncbi/amr amrfinder -n "${readfile}_consensus.fasta" --threads 8 > "${readfile}_AMRout.txt"
 
 
 # ABRicate command
