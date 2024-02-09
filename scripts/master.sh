@@ -21,11 +21,13 @@
 ################################################################################
 
 # Future additions:
-# docker containerization
-# Error handling
-# add argument flags
-# kraken 2 as double check for sendsketch and confindr
-# Transcription Factor binding sites(TFBS), promoter region?? Do any programs look for these in reads?
+# docker containerization!!
+# Error handling!!
+# add argument flags!!
+# kraken 2 as contamination check and double check for sendsketch. DONE
+# phylogenetic trees? This should probably be done manually after with the fastq files and some Reference fasta files with outgroups
+# BUSCO & MIDAS (Busco only works on .fasta)
+
 
 #1. Reference Preparation and indexing
 	# The following operations are done in a for loop through all fastq files.
@@ -59,10 +61,7 @@ else
 	pip install confindr #<-- in the conda env. A python file in the confindr has to be modified to work
 fi
 
-# Program takes in the following arguments:
-# 	The current date to name directory where all read and result files are put in (YY/MM/DD)
-# 	option to run AMRFinderPlus
-# 	option to run BMGAP (only works with bacterial meningitidis sequences)
+
 # These inputs should be changed to flags (-o, --output, -AMR, -BMGAP)
 dir=$1
 if [ -z "$dir" ]; then
@@ -102,9 +101,15 @@ mkdir $dir/reference
 mkdir $dir/reads
 mkdir $dir/results/alignments
 mkdir $dir/results/sendsketch
+mkdir $dir/results/kraken2
 if [ -d "./reads" ]; then
         mv ./reads/* .
 fi
+
+# export paths for MIDAS
+export PYTHONPATH=/home/mdhsequencing/.local/lib/python3.8:~/7T/MIDAS
+export PATH=$PATH:~/7T/MIDAS/scripts
+export MIDAS_DB=~/7T/MIDAS/MIDAS/midas_db_v1.2
 
 
 # export gsl path
@@ -147,12 +152,28 @@ for file in *.fastq*; do
 		filename2="${file%%.*}"
 
 		# Add fastp here for quality control, filtering, and adapter trimming
-		fastp -i $R1File -I $file -o "${filename}_filtered.fastq.gz" -O "${filename2}_filtered.fastq.gz" -j $filename.json -h $filename.html
-		mv $R1File $dir/reads
-		mv $file $dir/reads
+		fastp -i $R1File -I $file -o "${filename}_filtered.fastq.gz" -O "${filename2}_filtered.fastq.gz" \
+		-j $filename.json -h $filename.html
+		# Remove fastq files once we have filtered fastq files
+		rm $R1File
+		rm $file
+
+		# runs kraken2 on filtered fastq files and extracts top 5 results at species level
+		bash run_classifier.sh "${filename}_filtered.fastq.gz" "${filename2}_filtered.fastq.gz"
+
 
 		# sendsketch finds closest matching taxon and its taxid
 		~/bbmap/sendsketch.sh "${filename}_filtered.fastq.gz" reads=1m samplerate=0.5 minkeycount=2 > sendsketch.txt
+
+
+		# MIDAS
+		conda deactivate
+		conda activate py2
+		run_midas.py species $dir/results/MIDAS/$filename -1 "${filename}_filtered.fastq.gz" \
+		-2 "${filename2}_filtered.fastq.gz" -t 12 -d ~/7T/MIDAS/MIDAS/midas_db_v1.2 --remove_temp
+		conda deactivate
+		conda activate fastq_analysis
+
 
 		# could use kraken2 as a double check on sendsketch and confindr
 		# would tell us taxid of closest genus+species if ncbi-genome-download fails with taxid from sendsketch
@@ -167,7 +188,10 @@ for file in *.fastq*; do
 			# downloads reference file
 			# uses second taxid if first does not have a downloadable file
 			# reference sequences are not ideal but work fine
-			ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 bacteria,viral || (sed '1d' sendsketch.txt > tmpfile; mv tmpfile sendsketch.txt;taxids=$(python3 extract_taxid.py);ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 bacteria,viral; sed -i '1s/^/\n/' sendsketch.txt)
+			ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 bacteria,viral || \
+			(sed '1d' sendsketch.txt > tmpfile; mv tmpfile sendsketch.txt;taxids=$(python3 \
+			extract_taxid.py);ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 \
+			bacteria,viral; sed -i '1s/^/\n/' sendsketch.txt)
 
 			# keeps list of taxids used and makes a directory named after taxid for reference
 			taxid_list=(${taxid_list[@]} $taxids)
@@ -190,10 +214,12 @@ for file in *.fastq*; do
 		fi
 
 		# bwa alignment
-		bwa mem -R '@RG\tID:'$ID'\tLB:'$LB'\tPL:'$PL'\tSM:'$SM'\tPU:'$PU -v 2 -t 8 tmpRef/*.fna "${filename}_filtered.fastq.gz" "${filename2}_filtered.fastq.gz" > $dir/results/alignments/$filename.sam
+		bwa mem -R '@RG\tID:'$ID'\tLB:'$LB'\tPL:'$PL'\tSM:'$SM'\tPU:'$PU -v 2 -t 8 tmpRef/*.fna \
+		"${filename}_filtered.fastq.gz" "${filename2}_filtered.fastq.gz" > $dir/results/alignments/$filename.sam
 
 		# samtools indexing and making bam files
-		samtools view -u -@ 8 $dir/results/alignments/$filename.sam | samtools sort -@ 8 -o $dir/results/alignments/"${filename}_sorted.bam"
+		samtools view -u -@ 8 $dir/results/alignments/$filename.sam | samtools sort -@ 8 \
+		-o $dir/results/alignments/"${filename}_sorted.bam"
 		samtools index -@ 8 $dir/results/alignments/"${filename}_sorted.bam"
 
 		#Mark pcr duplicates in the sorted bam file before making vcf files for AMRFinder
@@ -218,28 +244,29 @@ for file in *.fastq*; do
     	bothfiles=true
 done
 rm -r ./tmpRef
-
+mv top_kraken_results_*.txt $dir/results/kraken2
+mv *k2_report.txt $dir/results/kraken2
 
 
 # THIS FASTQC could be deleted when fastp has been tested and works well, but summary file needs fastqc results
 # if we want to delete this fastqc, write_summary.py has to be edited to find QC metrics from fastp
 # QC general statistics (pass/fail) are not in the results of fastp
 # Quality Control with FastQc
-fastqc *.fastq* -o $dir -t 12
+fastqc *_filtered.fastq.gz -o $dir -t 12
 #fastqc is set temporarily to a different directory so multiqc doesnt use it (so summary file gets written properly)
 #fastqc $dir/results/alignments/*.sorted.bam -o $dir/results -t 12
 
 
 # Include these in our path for confindr to use
-export PATH=$PATH:/home/mdhsequencing/bbmap
-export PATH=$PATH:/home/mdhsequencing/kma
+#export PATH=$PATH:/home/mdhsequencing/bbmap
+#export PATH=$PATH:/home/mdhsequencing/kma
 
 # contamination finder
 # Not easy to get working. had to change a line of code in two python files (database_setup.py, bbtools.py)
 # :~/miniconda3-2/envs/condaenv/lib/python3.9/site-packages/confindr_src
 # confindr_src/wrappers/bbtools.py ----> in bbduk_bait function, added --ignorejunk flag to bbduk.sh cmd = ... commands
 # confindr_src/database_setup.py ----> line 209, added .encode() to the end of the line
-confindr.py -i ./ -o $dir/results/confindr_out --rmlst -d ~/.confindr_db
+#confindr.py -i ./ -o $dir/results/confindr_out --rmlst -d ~/.confindr_db
 
 
 # Qualimap mapping quality report
@@ -278,6 +305,7 @@ done
 
 # Writes all quality control statistics, Coverage, ANI... from read files to one excel file
 python write_summary.py $dir
+
 # move bam fastqc file and others back after summary written
 mv $dir/results/fastqc/tmp/* $dir/results/fastqc
 
@@ -310,8 +338,8 @@ mv *.html $dir/results/fastqc
 mv *.json $dir/results/fastqc
 
 ### Delete unfiltered fastq files to conserve space
-shopt -s extglob
-rm $dir/reads/!(*filtered*)
+#shopt -s extglob
+#rm $dir/reads/!(*filtered*)
 
 conda deactivate
 
