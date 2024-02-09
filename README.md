@@ -1,6 +1,8 @@
 # fastq_analysis
+
 ## Illumina paired fastq file analysis script. 
-## Tools include: fastp, Kraken2, MIDAS, BWA Alignment, Samtools, bcftools, AMRFinder+, FASTQC, qualimap, multiqc, and custom scripts. 
+
+### Tools include: fastp, Kraken2, MIDAS, BWA Alignment, Samtools, bcftools, AMRFinder+, FASTQC, qualimap, multiqc, and custom scripts. 
 
 ### How to use: 
 - Download scripts: https://github.com/eetueklund/fastq_analysis.git
