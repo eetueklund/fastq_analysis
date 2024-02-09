@@ -18,9 +18,9 @@ Conda Environment is automatically activated. If it does not already exist, a fa
 
 ### EXAMPLES:
    
-        Command: bash master.sh 230321
+        $ bash master.sh 230321
         
-        Command: bash scripts/master.sh 230321_CRE runAMR
+        $ bash scripts/master.sh 230321_CRE runAMR
 
 ###  FASTQ Analysis Steps
 
