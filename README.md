@@ -1,37 +1,36 @@
-# Allin1
-## Paired fastq file all-in-one analysis script. Quality Control, BWA Alignment, Samtools, sendsketch, bcftools, AMRFinder+, confindr, multiqc...
+# fastq_analysis
+## Paired fastq file analysis script. Quality Control, BWA Alignment, Samtools, bcftools, Kraken2, MIDAS, AMRFinder+, multiqc...
 
 ### How to use: 
 All fastq files should be located in current working directory. Have all script files either in current working directory or ./scripts directory. 
 
-First argument should be the date in YYMMDD format. This is where all files will be moved to.
+First argument is the output directory name to be created. This is where all files will be moved to.
 
-Optional second argument is the string "runAMR". This tells the program to run AMRFinder+. (Run time ~doubles)
+Optional second argument is the string "runAMR". This tells the program to run AMRFinder+ and also creates a consensus sequence. (Run time ~doubles)
 
-Conda Environment is automatically created and downloads all required packages if the environment does not already exist. (conda install step sometimes fails. This step should be containerized in the future)
+Conda Environment is automatically activated. If it does not already exist, a fastq_analysis conda environment is created and downloads all required packages 
+                                                                        (conda install step sometimes gets stuck. This step should be containerized in the future)
+
 ### EXAMPLES:
    
         Command: bash master.sh 230321
         
-        Command: bash scripts/master.sh 230321 runAMR
+        Command: bash scripts/master.sh 230321_CRE runAMR
 
-### 1. Reference Preparation and indexing
+### 1. FASTQ Analysis Steps
 
-        - Done in a for loop through all fastq files.
         - fastp preprocesses and filters raw reads
-        - sendsketch matches current fastq file to a reference sequence and downloads it using ncbi-genome-download
+        - top kraken results are extracted using run_classifier.sh as a taxonomy and contamination check
+        - MIDAS is used as a double check for contamination
+        - sendsketch from BBTools matches current fastq file to a reference sequence and downloads it using ncbi-genome-download
         - bwa index, samtool faidx, and picard dict are run on the reference sequences
         - bwa mem alignment is performed
         - samtools used for indexing, BAM creation, and sorting
-        - bcftools to make a consensus sequence based on read files
         - optionally AMRFinder+ finds Antimicrobial resistance genes
-            - This also creates a consensus fasta sequence from the .bam alignment file
-
-### 2. Sample QC and cleaning
-
+            - This also creates a consensus fasta sequence from the .bam alignment file using bcftools
         - fastqc is run on all fastq files and sorted bam files
-        - confindr determines levels of contamination in read files
         - qualimap multi-bamqc is performed on all sorted bam files
         - multiqc combines QC metrics into an html
-        - write_summary.py writes and excel file with key QC metrics for all fastq files
-        - directory is cleaned and unnecesary/large files are deleted or zipped.
+        - write_summary.py writes a summary excel file with key QC metrics and other results for all fastq files
+        - directory is cleaned and unnecesary/large files are deleted or zipped
+        - all results from the above tools will be in the results directory
