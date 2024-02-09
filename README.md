@@ -17,7 +17,7 @@ Conda Environment is automatically activated. If it does not already exist, a fa
         
         Command: bash scripts/master.sh 230321_CRE runAMR
 
-### 1. FASTQ Analysis Steps
+###  FASTQ Analysis Steps
 
         - fastp preprocesses and filters raw reads
         - top kraken results are extracted using run_classifier.sh as a taxonomy and contamination check
