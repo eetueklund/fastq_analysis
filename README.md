@@ -2,11 +2,9 @@
 ## Paired fastq file analysis script. Quality Control, BWA Alignment, Samtools, bcftools, Kraken2, MIDAS, AMRFinder+, multiqc...
 
 ### How to use: 
-All fastq files should be located in current working directory. Have all script files either in current working directory or ./scripts directory. 
-
-First argument is the output directory name to be created. This is where all files will be moved to.
-
-Optional second argument is the string "runAMR". This tells the program to run AMRFinder+ and also creates a consensus sequence. (Run time ~doubles)
+*All fastq files should be located in current working directory. Have all script files either in current working directory or ./scripts directory. 
+*First argument is the output directory name to be created. This is where all files will be moved to.
+*Optional second argument is the string "runAMR". This tells the program to run AMRFinder+ and also creates a consensus sequence. (Run time ~doubles)
 
 Conda Environment is automatically activated. If it does not already exist, a fastq_analysis conda environment is created and downloads all required packages 
                                                                         (conda install step sometimes gets stuck. This step should be containerized in the future)
