@@ -2,7 +2,9 @@
 ## Paired fastq file analysis script. Quality Control, BWA Alignment, Samtools, bcftools, Kraken2, MIDAS, AMRFinder+, multiqc...
 
 ### How to use: 
-- All fastq files should be located in current working directory. Have all script files either in current working directory or ./scripts directory. 
+- Download scripts: https://github.com/eetueklund/fastq_analysis.git
+
+- All fastq files should be located in the current working directory along with ./scripts directory. 
 
 - First argument is the output directory name to be created. This is where all files will be moved to.
 
