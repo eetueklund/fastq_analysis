@@ -93,9 +93,9 @@ if [[ $runAMR == "runAMR" ]]; then
 	fi
 fi
 
-if [ -d "./scripts/" ]; then
-        mv ./scripts/* .
-fi
+#if [ -d "./scripts/" ]; then
+#        mv ./scripts/* .
+#fi
 # creates directories to put output files in.
 mkdir $dir/reference
 mkdir $dir/reads
@@ -181,7 +181,7 @@ for file in *.fastq*; do
 		# Takes a while to load into memory, has to do it for each fastq pair
 
 		# extracts taxid for the species (only first single reference file)
-		taxids=$(python3 extract_taxid.py)
+		taxids=$(python3 scripts/extract_taxid.py)
 
 		# if taxid has not been used, reference file is downloaded and index/dict files created
 		if ! echo ${taxid_list[@]} | grep -w -q $taxids; then
@@ -190,7 +190,7 @@ for file in *.fastq*; do
 			# reference sequences are not ideal but work fine
 			ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 bacteria,viral || \
 			(sed '1d' sendsketch.txt > tmpfile; mv tmpfile sendsketch.txt;taxids=$(python3 \
-			extract_taxid.py);ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 \
+			scripts/extract_taxid.py);ncbi-genome-download --taxids $taxids --formats fasta --parallel 4 \
 			bacteria,viral; sed -i '1s/^/\n/' sendsketch.txt)
 
 			# keeps list of taxids used and makes a directory named after taxid for reference
@@ -271,14 +271,17 @@ fastqc *_filtered.fastq.gz -o $dir -t 12
 
 # Qualimap mapping quality report
 unset display # stops qualimap display from appearing
-#qualimap bamqc -bam results/alignments/*.sorted.bam --java-mem-size=5G -outdir ./results/qualimap
 
-# Python program to write bam_files.txt (file of bam file names use by multi-bamqc)
-python3 write_bam_files.py $dir
-mv bam_files.txt $dir/results/alignments
-
-# qualimap for multiple bam files
-qualimap multi-bamqc -r -d $dir/results/alignments/bam_files.txt --java-mem-size=5G -outdir $dir/results/qualimap
+# uses bamqc if only one pair of fastq files provided, else it uses multi-bamqc
+if [[ $(ls -lR ./*.fastq.gz | wc -l) == 2 ]]; then
+	qualimap bamqc -bam $dir/results/alignments/*.bam --java-mem-size=5G -outdir $dir/results/qualimap
+else
+	# Python program to write bam_files.txt (file of bam file names use by multi-bamqc)
+	python3 scripts/write_bam_files.py $dir
+	mv bam_files.txt $dir/results/alignments
+	# qualimap for multiple bam files
+	qualimap multi-bamqc -r -d $dir/results/alignments/bam_files.txt --java-mem-size=5G -outdir $dir/results/qualimap
+fi
 
 # multiqc scans current directory and makes a report from fastqc outputs
 multiqc $dir
@@ -304,14 +307,14 @@ done
 
 
 # Writes all quality control statistics, Coverage, ANI... from read files to one excel file
-python write_summary.py $dir
+python scripts/write_summary.py $dir
 
 # move bam fastqc file and others back after summary written
 mv $dir/results/fastqc/tmp/* $dir/results/fastqc
 
 # writes summary file from AMRFinderPlus results
 if [[ $runAMR == "runAMR" ]]; then
-	python3 AMR_write.py $dir
+	python3 scripts/AMR_write.py $dir
 fi
 
 # Remove large files (like sam files but keep bam) to save space
@@ -332,8 +335,8 @@ mv *.fastq* $dir/reads
 if [ ! -d "./scripts/" ]; then
         mkdir scripts
 fi
-mv *.sh scripts
-mv *.py scripts
+#mv *.sh scripts
+#mv *.py scripts
 mv *.html $dir/results/fastqc
 mv *.json $dir/results/fastqc
 

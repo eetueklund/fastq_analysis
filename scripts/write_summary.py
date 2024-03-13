@@ -191,7 +191,7 @@ for line in f4:
                 if float(percent) <= 80:
                     worksheet.write(iter+1, 16, taxonomy.lstrip(' '), cell_format2)
                     worksheet.write(iter+1, 17, percent, cell_format2)
-                elif float(percent) <= 60:
+                elif float(percent) <= 65:
                     worksheet.write(iter+1, 16, taxonomy.lstrip(' '), cell_format)
                     worksheet.write(iter+1, 17, percent, cell_format)
                 else:
